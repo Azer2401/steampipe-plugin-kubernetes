@@ -1,0 +1,11 @@
+apiVersion: tenants.cloudeka.ai/v1alpha2
+kind: CloudekaGuard
+metadata:
+  name: deny-all-ingress
+  namespace: observability1
+spec:
+  endpointSelector:
+    matchLabels:
+      namespace: observability1
+  ingress:
+  - {}
