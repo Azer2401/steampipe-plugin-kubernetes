@@ -24,17 +24,23 @@ func tableKubernetesCloudekaGuard(_ context.Context) *plugin.Table {
 			{Name: "uid", Type: proto.ColumnType_STRING, Description: "UID of the CloudekaGuard."},
 			{Name: "labels", Type: proto.ColumnType_JSON, Description: "Labels of the CloudekaGuard."},
 			{Name: "annotations", Type: proto.ColumnType_JSON, Description: "Annotations of the CloudekaGuard."},
+			{Name: "endpoint_selector", Type: proto.ColumnType_JSON, Description: "EndpointSelector defines which pods this policy applies to."},
+			{Name: "ingress", Type: proto.ColumnType_JSON, Description: "Ingress is a list of ingress rules."},
+			{Name: "egress", Type: proto.ColumnType_JSON, Description: "Egress is a list of egress rules."},
 		},
 	}
 }
 
 type CloudekaGuard struct {
 	// inherit from metav1.ObjectMeta
-	Name        string
-	Namespace   string
-	UID         string
-	Labels      map[string]string
-	Annotations map[string]string
+	Name             string                 `json:"name"`
+	Namespace        string                 `json:"namespace"`
+	UID              string                 `json:"uid"`
+	Labels           map[string]string      `json:"labels"`
+	Annotations      map[string]string      `json:"annotations"`
+	EndpointSelector map[string]interface{} `json:"endpoint_selector"`
+	Ingress          []interface{}          `json:"ingress"`
+	Egress           []interface{}          `json:"egress"`
 }
 
 // ## Lists all CloudekaGuard resources from the cluster.
@@ -67,12 +73,35 @@ func listKubernetesCloudekaGuards(ctx context.Context, d *plugin.QueryData, _ *p
 
 	// Loop through the found items and stream them to Steampipe
 	for _, item := range list.Items {
+		// Extract spec data
+		spec := item.Object["spec"]
+		var endpointSelector map[string]interface{}
+		var ingress []interface{}
+		var egress []interface{}
+
+		if spec != nil {
+			if specMap, ok := spec.(map[string]interface{}); ok {
+				if es, exists := specMap["endpointSelector"]; exists {
+					endpointSelector, _ = es.(map[string]interface{})
+				}
+				if ing, exists := specMap["ingress"]; exists {
+					ingress, _ = ing.([]interface{})
+				}
+				if eg, exists := specMap["egress"]; exists {
+					egress, _ = eg.([]interface{})
+				}
+			}
+		}
+
 		d.StreamListItem(ctx, CloudekaGuard{
-			Name:        item.GetName(),
-			Namespace:   item.GetNamespace(),
-			UID:         string(item.GetUID()),
-			Labels:      item.GetLabels(),
-			Annotations: item.GetAnnotations(),
+			Name:             item.GetName(),
+			Namespace:        item.GetNamespace(),
+			UID:              string(item.GetUID()),
+			Labels:           item.GetLabels(),
+			Annotations:      item.GetAnnotations(),
+			EndpointSelector: endpointSelector,
+			Ingress:          ingress,
+			Egress:           egress,
 		})
 
 		// Stop processing if the query has been cancelled or the limit has been reached
